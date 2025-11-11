@@ -33,6 +33,7 @@ class Session:
         
         # Create certs directory
         os.makedirs(self.cert_dir, exist_ok=True)
+        self._ensure_cert_placeholders()
         
         # Set timestamps
         self.created_at = datetime.now().isoformat()
@@ -66,6 +67,19 @@ class Session:
         session.save()
         
         return session
+
+    def _ensure_cert_placeholders(self):
+        """Create placeholder certificate files for new sessions."""
+        placeholders = {
+            'ca_cert': "# Paste the CA certificate chain here\n",
+            'client_cert': "# Paste the client certificate here\n",
+            'client_key': "# Paste the client private key here\n"
+        }
+
+        for key, path in self.get_cert_paths().items():
+            if not os.path.exists(path):
+                with open(path, 'w') as cert_file:
+                    cert_file.write(placeholders[key])
     
     def save(self):
         """Save session configuration to disk"""

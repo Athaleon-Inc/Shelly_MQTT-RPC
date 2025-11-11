@@ -28,6 +28,7 @@
 - Persist the `id` to match asynchronous responses from the broker.
 - Example certificate update:
 
+Topic: {MQTT_PREFIX}/rpc
 ```json
 {
   "id": 1,
@@ -41,6 +42,7 @@
 
 - Example reboot command:
 
+Topic: {MQTT_PREFIX}/rpc
 ```json
 {
   "id": 5,
@@ -51,6 +53,7 @@
 
 - Examplple update MQTT connection setting
 
+Topic: {MQTT_PREFIX}/rpc
 ```json
 {
   "id": 301,
