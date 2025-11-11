@@ -1,12 +1,8 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
-*.py[codz]
+*.py[cod]
 *$py.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -20,6 +16,7 @@ parts/
 sdist/
 var/
 wheels/
+pip-wheel-metadata/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
@@ -205,3 +202,36 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# Logs
+logs/
+*.log
+
+# Sessions
+sessions/
+
+# Temporary RPC Commands
+temp/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Configuration (may contain sensitive data)
+configs/certs/
+configs/config.json
+
+# Keep example config
+!configs/config.json.example

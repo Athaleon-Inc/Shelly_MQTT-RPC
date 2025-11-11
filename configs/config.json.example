@@ -1,0 +1,28 @@
+{
+  "mqtt": {
+    "host": "mqtt.example.com",
+    "port": 8883,
+    "use_tls": true,
+    "ca_cert": "",
+    "client_cert": "",
+    "client_key": "",
+    "username": "",
+    "password": "",
+    "client_id": "shelly_manager",
+    "skip_cert_cn_check": true,
+    "response_timeout": 30
+  },
+  "rpc": {
+    "chunk_size": 2048,
+    "default_src": "sunio_app"
+  },
+  "session": {
+    "default_mqtt_prefix_template": "shellypro4pm-{device_id}"
+  },
+  "application": {
+    "log_level": "INFO",
+    "log_file": "logs/shelly_mqtt_rpc.log",
+    "console_theme": "monokai"
+  }
+}
+
