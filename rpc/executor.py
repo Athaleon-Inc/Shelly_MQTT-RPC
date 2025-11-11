@@ -204,11 +204,13 @@ class RPCExecutor:
             
             if not response.success:
                 self.console.print(f"[red]Chunk {i+1} failed: {response.error}[/red]")
+                self._display_response(response)
                 responses.append(response)
                 # Stop on error
                 break
             
             self.console.print(f"[green]Chunk {i+1} uploaded successfully[/green]")
+            self._display_response(response)
             responses.append(response)
         
         # Display final result
@@ -237,11 +239,6 @@ class RPCExecutor:
         Returns:
             RPCResponse if successful, None otherwise
         """
-        msg_id = self.get_next_msg_id()
-        src = self.config.get('rpc', {}).get('default_src', 'sunio_app')
-        
-        payload = RPCRequestBuilder.build_mqtt_config_update(msg_id, mqtt_config, src)
-        
         return self.execute_rpc(session, "MQTT.SetConfig", 
                               params={"config": mqtt_config}, 
                               auto_confirm=auto_confirm, timeout=timeout)

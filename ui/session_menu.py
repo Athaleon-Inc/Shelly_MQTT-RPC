@@ -1,7 +1,10 @@
 """Session-specific RPC operations menu"""
-from typing import Optional, Dict, Any
+
+import json
 import logging
 import os
+from typing import Any, Dict, Optional
+
 from rich.console import Console
 
 from core.session import Session
@@ -11,9 +14,15 @@ from ui.prompts import UIPrompts
 
 class SessionMenu:
     """Menu for RPC operations on a specific session"""
-    
-    def __init__(self, session: Session, mqtt_client, rpc_executor, 
-                 config: Dict[str, Any], logger: Optional[logging.Logger] = None):
+
+    def __init__(
+        self,
+        session: Session,
+        mqtt_client,
+        rpc_executor,
+        config: Dict[str, Any],
+        logger: Optional[logging.Logger] = None,
+    ):
         """
         Initialize session menu.
         
@@ -164,32 +173,37 @@ class SessionMenu:
     def _update_mqtt_config(self):
         """Update MQTT configuration"""
         self.console.print("\n[bold cyan]Update MQTT Configuration[/bold cyan]\n")
-        
+
         try:
-            # Prompt for MQTT settings
-            self.console.print("Enter new MQTT configuration:")
-            
-            enable = self.prompts.prompt_yes_no("Enable MQTT", default=True)
-            server = self.prompts.prompt_text("Server (e.g., mqtts://mqtt.example.com:8883)", required=True)
-            client_id = self.prompts.prompt_text("Client ID", required=True)
-            user = self.prompts.prompt_text("Username", default="")
-            password = self.prompts.prompt_text("Password", default="")
-            ssl_ca = self.prompts.prompt_choice("SSL CA", ["*", "ca.pem", "user_ca.pem"], default="*")
-            use_client_cert = self.prompts.prompt_yes_no("Use client certificate", default=True)
-            skip_cert_cn_check = self.prompts.prompt_yes_no("Skip certificate CN check", default=True)
-            
-            # Build config
-            mqtt_config = {
-                "enable": enable,
-                "server": server,
-                "client_id": client_id,
-                "user": user,
-                "pass": password,
-                "ssl_ca": ssl_ca,
-                "use_client_cert": use_client_cert,
-                "skip_cert_cn_check": skip_cert_cn_check
-            }
-            
+            stored_config = self.session.get_mqtt_config()
+            mqtt_config: Optional[Dict[str, Any]] = None
+
+            if stored_config:
+                self.console.print("[cyan]Stored session MQTT configuration found:[/cyan]")
+                self.console.print(json.dumps(stored_config, indent=2))
+                selection = self.prompts.prompt_choice(
+                    "Use session configuration or enter custom values",
+                    ["session", "custom"],
+                    default="session",
+                )
+                if selection.lower() == "session":
+                    mqtt_config = dict(stored_config)
+            else:
+                self.console.print("[yellow]No stored session MQTT configuration found.[/yellow]")
+
+            if mqtt_config is None:
+                mqtt_config = self._prompt_custom_mqtt_config()
+                if self.prompts.prompt_yes_no(
+                    "Save this configuration to the session?",
+                    default=True,
+                ):
+                    self.session.update_mqtt_config(mqtt_config)
+                    self.console.print("[green]Session MQTT configuration updated.[/green]")
+                else:
+                    self.console.print(
+                        "[yellow]Custom configuration will not be stored in the session.[/yellow]"
+                    )
+
             # Execute
             response = self.rpc_executor.execute_mqtt_config_update(
                 self.session,
@@ -208,6 +222,36 @@ class SessionMenu:
         
         self.prompts.prompt_text("\nPress Enter to continue")
     
+    def _prompt_custom_mqtt_config(self) -> Dict[str, Any]:
+        """Prompt user for custom MQTT configuration values"""
+        self.console.print("Enter new MQTT configuration:")
+
+        enable = self.prompts.prompt_yes_no("Enable MQTT", default=True)
+        server = self.prompts.prompt_text(
+            "Server (e.g., mqtts://mqtt.example.com:8883)", required=True
+        )
+        client_id = self.prompts.prompt_text("Client ID", required=True)
+        user = self.prompts.prompt_text("Username", default="")
+        password = self.prompts.prompt_text("Password", default="")
+        ssl_ca = self.prompts.prompt_choice(
+            "SSL CA", ["*", "ca.pem", "user_ca.pem"], default="*"
+        )
+        use_client_cert = self.prompts.prompt_yes_no("Use client certificate", default=True)
+        skip_cert_cn_check = self.prompts.prompt_yes_no(
+            "Skip certificate CN check", default=True
+        )
+
+        return {
+            "enable": enable,
+            "server": server,
+            "client_id": client_id,
+            "user": user,
+            "pass": password,
+            "ssl_ca": ssl_ca,
+            "use_client_cert": use_client_cert,
+            "skip_cert_cn_check": skip_cert_cn_check,
+        }
+
     def _upload_ca_cert(self):
         """Upload CA certificate"""
         self.console.print("\n[bold cyan]Upload CA Certificate[/bold cyan]\n")
