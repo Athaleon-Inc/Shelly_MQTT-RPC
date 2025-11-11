@@ -170,11 +170,19 @@ Each session is stored in `sessions/{session_name}/config.json`:
 When uploading certificates:
 
 1. The application reads the certificate file
+2. Header/footer PEM markers (`-----BEGIN/END ...-----`) are stripped automatically, leaving only the base64 payload expected by Shelly RPC
 2. Checks size against configured chunk limit
 3. Automatically splits into chunks if needed
 4. Displays all chunks for review
 5. Sends chunks sequentially on confirmation
 6. Each chunk uses `append: false` for first, `append: true` for subsequent chunks
+
+#### Manual Verification Checklist
+
+- Export the desired certificate chain in PEM format (one or more concatenated certificates).
+- Use the application to upload the file to a test Shelly device; confirm the previewed payload omits the PEM boundary lines.
+- After upload, verify on the device (e.g., via Shelly web UI or `Shelly.GetStatus`) that the certificate was stored and is valid.
+- If the upload fails, inspect the saved JSON command in `temp/rpc_commands/` to confirm the payload only contains base64 characters and rerun with adjusted chunk size if needed.
 
 ## RPC Methods Supported
 

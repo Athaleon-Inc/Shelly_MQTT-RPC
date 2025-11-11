@@ -1,34 +1,79 @@
 """Certificate utilities for converting and handling certificates/keys"""
 import base64
 import os
-from typing import Optional
+from typing import List
 
 
 def cert_to_pem_string(cert_path: str) -> str:
     """
-    Read a certificate or key file and return it as a PEM format string.
-    Preserves newlines and formatting.
+    Read a certificate or key file and return its payload string stripped of
+    PEM header/footer markers. The resulting string contains only the base64
+    body, suitable for Shelly RPC uploads.
     
     Args:
         cert_path: Path to the certificate or key file
         
     Returns:
-        PEM formatted string with newlines preserved
+        String containing the concatenated base64 body of the PEM content
         
     Raises:
         FileNotFoundError: If the certificate file doesn't exist
+        ValueError: If no PEM payload could be extracted
     """
     if not os.path.exists(cert_path):
         raise FileNotFoundError(f"Certificate file not found: {cert_path}")
     
-    with open(cert_path, 'r') as f:
+    with open(cert_path, 'r', encoding='utf-8') as f:
         content = f.read()
     
-    # Ensure the content ends with a newline if it doesn't already
-    if not content.endswith('\n'):
-        content += '\n'
+    payload = strip_pem_boundaries(content)
     
-    return content
+    if not payload:
+        raise ValueError(f"Certificate file contains no PEM data: {cert_path}")
+    
+    return payload
+
+
+def strip_pem_boundaries(content: str) -> str:
+    """
+    Remove PEM BEGIN/END markers and whitespace, returning only the base64 body.
+    Supports multiple concatenated PEM blocks (e.g., certificate chains).
+    
+    Args:
+        content: Raw PEM string, potentially containing multiple blocks
+        
+    Returns:
+        Concatenated base64 payload string without markers or whitespace
+    """
+    blocks: List[str] = []
+    collecting = False
+    current: List[str] = []
+    
+    for line in content.splitlines():
+        stripped = line.strip()
+        
+        if not stripped:
+            continue
+        
+        if stripped.startswith("-----BEGIN "):
+            collecting = True
+            current = []
+            continue
+        
+        if stripped.startswith("-----END "):
+            if collecting and current:
+                blocks.append("".join(current))
+            collecting = False
+            current = []
+            continue
+        
+        if collecting:
+            current.append(stripped)
+    
+    if collecting:
+        raise ValueError("Incomplete PEM content: missing END marker")
+    
+    return "".join(blocks)
 
 
 def pem_to_base64(pem_string: str) -> str:
@@ -98,4 +143,22 @@ def get_cert_size(cert_path: str) -> int:
         raise FileNotFoundError(f"Certificate file not found: {cert_path}")
     
     return os.path.getsize(cert_path)
+
+
+def read_pem_file(cert_path: str) -> str:
+    """
+    Read a PEM file (certificate or key) and return its full textual contents
+    without stripping headers, footers, or whitespace.
+    
+    Args:
+        cert_path: Path to the certificate or key file
+        
+    Returns:
+        Raw PEM text as read from disk
+    """
+    if not os.path.exists(cert_path):
+        raise FileNotFoundError(f"Certificate file not found: {cert_path}")
+    
+    with open(cert_path, 'r', encoding='utf-8') as f:
+        return f.read()
 

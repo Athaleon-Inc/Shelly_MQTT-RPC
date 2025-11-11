@@ -4,7 +4,6 @@ import logging
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
-from rich.table import Table
 import json
 
 from core.session import Session
@@ -12,7 +11,7 @@ from mqtt.client import MQTTClient
 from mqtt.publisher import RPCPublisher
 from rpc.request_builder import RPCRequestBuilder
 from rpc.response_handler import RPCResponseHandler, RPCResponse
-from helpers.cert_utils import cert_to_pem_string
+from helpers.cert_utils import read_pem_file
 from helpers.chunker import chunk_data, get_chunk_info
 from helpers.rpc_command_saver import save_rpc_command
 
@@ -127,11 +126,15 @@ class RPCExecutor:
         Returns:
             List of RPCResponse objects (one per chunk)
         """
-        # Read certificate
+        # Read certificate preserving full PEM content
         try:
-            cert_data = cert_to_pem_string(cert_path)
-        except FileNotFoundError as e:
+            cert_data = read_pem_file(cert_path)
+        except (FileNotFoundError, UnicodeDecodeError) as e:
             self.console.print(f"[red]Error: {e}[/red]")
+            return []
+        
+        if not cert_data.strip():
+            self.console.print(f"[red]Error: Certificate file is empty: {cert_path}[/red]")
             return []
         
         # Get chunk size from config
@@ -170,6 +173,30 @@ class RPCExecutor:
             if not self._confirm_send():
                 self.console.print("[yellow]Upload cancelled by user[/yellow]")
                 return []
+
+        # Issue delete command before uploading new data, matching shelly-cert behavior
+        self.console.print(
+            "[cyan]Deleting existing certificate/key on device...[/cyan]"
+        )
+        delete_response = self.execute_rpc(
+            session,
+            method,
+            params={"data": None},
+            auto_confirm=True,
+            timeout=timeout
+        )
+        delete_failed = (
+            delete_response is None
+            or (
+                hasattr(delete_response, "success")
+                and not delete_response.success
+            )
+        )
+        if delete_failed:
+            self.console.print(
+                "[red]Pre-upload deletion failed. Aborting upload.[/red]"
+            )
+            return []
         
         # Subscribe to response topic
         response_topic = f"{src}/rpc"

@@ -1,8 +1,24 @@
 """Data chunking utilities for splitting large payloads"""
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 
 
-def chunk_data(data: str, max_size: int) -> List[Dict[str, Any]]:
+def _ensure_bytes(data: Union[str, bytes]) -> bytes:
+    """
+    Convert incoming data (str or bytes) to raw bytes without loss.
+    
+    Args:
+        data: Data as string or bytes
+        
+    Returns:
+        Raw bytes representation
+    """
+    if isinstance(data, bytes):
+        return data
+    # UTF-8 maintains PEM/base64 data while supporting text inputs
+    return data.encode('utf-8')
+
+
+def chunk_data(data: Union[str, bytes], max_size: int) -> List[Dict[str, Any]]:
     """
     Divide large data into manageable chunks.
     
@@ -19,14 +35,15 @@ def chunk_data(data: str, max_size: int) -> List[Dict[str, Any]]:
         - is_last: True if this is the last chunk
         - append: False for first chunk, True for subsequent chunks
     """
-    if not data:
+    if data in (None, b"", ""):
         return []
     
     # If data fits in one chunk, return it as a single chunk
-    data_size = len(data.encode('utf-8'))
+    data_bytes = _ensure_bytes(data)
+    data_size = len(data_bytes)
     if data_size <= max_size:
         return [{
-            'chunk': data,
+            'chunk': data_bytes.decode('latin-1'),
             'index': 0,
             'total': 1,
             'is_first': True,
@@ -36,15 +53,14 @@ def chunk_data(data: str, max_size: int) -> List[Dict[str, Any]]:
         }]
     
     # Split data into chunks
-    chunks = []
-    data_bytes = data.encode('utf-8')
+    chunks: List[Dict[str, Any]] = []
     offset = 0
     chunk_index = 0
     
     while offset < len(data_bytes):
         # Get the next chunk
         chunk_bytes = data_bytes[offset:offset + max_size]
-        chunk_str = chunk_bytes.decode('utf-8', errors='ignore')
+        chunk_str = chunk_bytes.decode('latin-1')
         
         chunks.append({
             'chunk': chunk_str,
@@ -66,7 +82,7 @@ def chunk_data(data: str, max_size: int) -> List[Dict[str, Any]]:
     return chunks
 
 
-def calculate_chunk_count(data: str, max_size: int) -> int:
+def calculate_chunk_count(data: Union[str, bytes], max_size: int) -> int:
     """
     Calculate how many chunks will be needed for the data.
     
@@ -77,17 +93,17 @@ def calculate_chunk_count(data: str, max_size: int) -> int:
     Returns:
         Number of chunks needed
     """
-    if not data:
+    if data in (None, b"", ""):
         return 0
     
-    data_size = len(data.encode('utf-8'))
+    data_size = len(_ensure_bytes(data))
     if data_size <= max_size:
         return 1
     
     return (data_size + max_size - 1) // max_size  # Ceiling division
 
 
-def get_chunk_info(data: str, max_size: int) -> Dict[str, Any]:
+def get_chunk_info(data: Union[str, bytes], max_size: int) -> Dict[str, Any]:
     """
     Get information about chunking requirements without actually chunking.
     
@@ -102,7 +118,7 @@ def get_chunk_info(data: str, max_size: int) -> Dict[str, Any]:
         - needs_chunking: True if chunking is required
         - avg_chunk_size: Average chunk size
     """
-    if not data:
+    if data in (None, b"", ""):
         return {
             'total_size': 0,
             'chunk_count': 0,
@@ -110,7 +126,7 @@ def get_chunk_info(data: str, max_size: int) -> Dict[str, Any]:
             'avg_chunk_size': 0
         }
     
-    total_size = len(data.encode('utf-8'))
+    total_size = len(_ensure_bytes(data))
     chunk_count = calculate_chunk_count(data, max_size)
     
     return {
