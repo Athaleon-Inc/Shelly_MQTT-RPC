@@ -1,6 +1,7 @@
 """RPC executor for managing the complete RPC workflow"""
 from typing import Dict, Any, Optional, List
 import logging
+import time
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -36,6 +37,9 @@ class RPCExecutor:
         self.logger = logger or logging.getLogger("shelly_mqtt_rpc.executor")
         self.publisher = RPCPublisher(mqtt_client, logger)
         self.console = Console()
+        rpc_config = self.config.get('rpc', {}) if isinstance(self.config, dict) else {}
+        self.call_delay = float(rpc_config.get('call_delay_seconds') or 0)
+        self._last_publish_time: Optional[float] = None
         
         # Message ID counter
         self._next_msg_id = 1
@@ -89,7 +93,9 @@ class RPCExecutor:
         self.mqtt_client.subscribe(response_topic, self.response_handler.handle_message)
         
         # Publish
+        self._respect_call_delay()
         published_id = self.publisher.publish_rpc(session.mqtt_prefix, payload)
+        self._last_publish_time = time.monotonic()
         
         if published_id is None:
             self.console.print("[red]Failed to publish RPC command[/red]")
@@ -213,7 +219,9 @@ class RPCExecutor:
             self.response_handler.register_request(msg_id)
             
             # Publish
+            self._respect_call_delay()
             published_id = self.publisher.publish_rpc(session.mqtt_prefix, payload)
+            self._last_publish_time = time.monotonic()
             
             if published_id is None:
                 self.console.print(f"[red]Failed to publish chunk {i+1}[/red]")
@@ -275,6 +283,33 @@ class RPCExecutor:
         json_str = json.dumps(payload, indent=2)
         syntax = Syntax(json_str, "json", theme="monokai", line_numbers=False)
         self.console.print(Panel(syntax, title=title))
+    
+    def _respect_call_delay(self):
+        """Ensure minimum delay between consecutive RPC publishes"""
+        if self.call_delay <= 0:
+            return
+        
+        if self._last_publish_time is None:
+            return
+        
+        elapsed = time.monotonic() - self._last_publish_time
+        remaining = self.call_delay - elapsed
+        if remaining <= 0:
+            return
+
+        step = 0.5
+        remaining = max(remaining, 0)
+        with self.console.status(
+            f"[cyan]Waiting {remaining:.1f}s before next RPC...[/cyan]"
+        ) as status:
+            while remaining > 0:
+                wait = min(step, remaining)
+                time.sleep(wait)
+                remaining = round(max(remaining - wait, 0), 2)
+                if remaining > 0:
+                    status.update(
+                        f"[cyan]Waiting {remaining:.1f}s before next RPC...[/cyan]"
+                    )
     
     def _display_response(self, response: RPCResponse):
         """Display RPC response"""

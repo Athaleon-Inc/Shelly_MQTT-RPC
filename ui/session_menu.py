@@ -233,9 +233,14 @@ class SessionMenu:
         client_id = self.prompts.prompt_text("Client ID", required=True)
         user = self.prompts.prompt_text("Username", default="")
         password = self.prompts.prompt_text("Password", default="")
-        ssl_ca = self.prompts.prompt_choice(
-            "SSL CA", ["*", "ca.pem", "user_ca.pem"], default="*"
-        )
+        mqtt_defaults = self.config.get("mqtt", {})
+        session_certs = self.session.get_cert_paths()
+
+        ssl_ca_options = ["*", "user_ca.pem", "ca.pem"]
+        ssl_ca_default = mqtt_defaults.get("ssl_ca", "*")
+        if ssl_ca_default not in ssl_ca_options:
+            ssl_ca_default = "*"
+        ssl_ca = self.prompts.prompt_choice("SSL CA", ssl_ca_options, default=ssl_ca_default)
         use_client_cert = self.prompts.prompt_yes_no("Use client certificate", default=True)
         skip_cert_cn_check = self.prompts.prompt_yes_no(
             "Skip certificate CN check", default=True
@@ -250,6 +255,8 @@ class SessionMenu:
             "ssl_ca": ssl_ca,
             "use_client_cert": use_client_cert,
             "skip_cert_cn_check": skip_cert_cn_check,
+            "client_cert": "client.crt",
+            "client_key": "client.key",
         }
 
     def _upload_ca_cert(self):

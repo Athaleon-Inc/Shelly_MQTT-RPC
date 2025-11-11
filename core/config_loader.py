@@ -73,6 +73,10 @@ class ConfigLoader:
         """Get RPC configuration section"""
         return self.get('rpc', default={})
     
+    def get_rpc_call_delay(self, default: float = 0.0) -> float:
+        """Get configured delay between RPC calls in seconds"""
+        return self.get('rpc', 'call_delay_seconds', default=default)
+    
     def get_session_config(self) -> Dict[str, Any]:
         """Get session configuration section"""
         return self.get('session', default={})
